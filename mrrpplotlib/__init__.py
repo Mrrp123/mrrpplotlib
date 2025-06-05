@@ -192,7 +192,7 @@ def histerr_comparison(arrays: ArrayLike, err_types: Iterable[str] | str = "pois
                                         1 + np.divide(fill_err, fill_hist, where=(fill_hist > 0), out=(np.ones(fill_hist.shape) * -2)),
                                         alpha=0.3, step="post", color=color)
         else:
-            ax2.step(step_bins, np.divide(step_hist, step_hist_0, where=(step_hist_0 > 0), out=(np.ones(step_hist.shape) * -1)), where=steps[i], **mpl_kwargs)
+            ax2.step(step_bins, np.divide(step_hist, step_hist_0, where=(step_hist_0 > 0), out=(np.ones(step_hist.shape) * -1)), where=steps[i], color=color, **mpl_kwargs)
             ax2.fill_between(bin_edges, np.divide((fill_hist - fill_err), fill_hist_0, where=(fill_hist_0 > 0), out=(np.ones(fill_hist.shape) * -1)),
                                         np.divide((fill_hist + fill_err), fill_hist_0, where=(fill_hist_0 > 0), out=(np.ones(fill_hist.shape) * -1)),
                                         alpha=0.3, step="post", color=color)
