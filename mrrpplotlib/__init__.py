@@ -7,7 +7,7 @@ from matplotlib.axes import Axes
 
 from collections.abc import Iterable
 
-def _create_iterable(obj, length, force_iter=False):
+def _create_iterable(obj, length: int, force_iter=False):
     if not isinstance(obj, Iterable) or isinstance(obj, str) or force_iter:
         return [obj] * length
     if len(obj) == length:
@@ -16,7 +16,9 @@ def _create_iterable(obj, length, force_iter=False):
         raise ValueError(f"Expected object of length [{length}], got [{len(obj)}]")
     
 
-def histerr(x: ArrayLike, err_type="poisson", bins=10, norm_method=None, weight=None, step="post", ax=None, **mpl_kwargs):
+def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10, norm_method: str | None = None, 
+            weight: float | None = None, step: str = "post", ax: Axes | None = None, 
+            **mpl_kwargs):
     """
     Works like a regular histogram, but additionally handles adding in error bar via ax.fill_between
 
@@ -87,7 +89,9 @@ def histerr(x: ArrayLike, err_type="poisson", bins=10, norm_method=None, weight=
     return ax, (bin_edges, hist, err)
 
 
-def histerr_comparison(arrays: ArrayLike, err_types="poisson", bins=10, norm_methods=None, weights=None, steps="post", ax=None, **mpl_kwargs):
+def histerr_comparison(arrays: ArrayLike, err_types: Iterable[str] | str = "poisson", bins: int | ArrayLike = 10, 
+                       norm_methods: Iterable[str] | str | None = None, weights: ArrayLike | None = None, steps: Iterable[str] | str = "post", 
+                       ax: Axes | None = None, **mpl_kwargs):
     """
     Deals with a plot I seem to make *a lot*, plots a set of histograms together and creates an additional comparison at
     the bottom of the plot between the two.

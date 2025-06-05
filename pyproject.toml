@@ -9,7 +9,7 @@ authors = [{name="Mrrp", email="TheMrrp123@gmail.com"}]
 description = "A small set of custom plotting functions that I use a lot"
 readme = "README.md"
 dependencies = ["numpy>=1.21.0", "matplotlib>=3.6"]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
