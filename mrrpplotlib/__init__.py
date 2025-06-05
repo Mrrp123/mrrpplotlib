@@ -17,7 +17,7 @@ def _create_iterable(obj, length: int, force_iter=False):
     
 
 def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10, norm_method: str | None = None, 
-            weight: float | None = None, step: str = "post", ax: Axes | None = None, 
+            weights: ArrayLike | None = None, scale_factor: float | None = None, step: str = "post", ax: Axes | None = None, 
             **mpl_kwargs):
     """
     Works like a regular histogram, but additionally handles adding in error bar via ax.fill_between
@@ -31,7 +31,9 @@ def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10,
     norm_method : str or None
         Determines the normalization method used on the histogram, can be either 'count' (sum of counts in histogram equals 1) or 
         'area' (integral of histogram/area of bins equals 1). Cannot be set at the same time as 'weight'
-    weight : float or None
+    weights : ArrayLike or None
+        Determines the weight for each entry in the histogram, same as weight in np.histogram
+    scale_factor : float or None
         Determines a flat scaling factor to multiply our array by. Cannot be set at the same time as 'norm_method'
     step : str
         Same as passing 'where' parameter to plt.step and 'step' parameter to 'plt.fill_between', basically determines where your histogram
@@ -42,15 +44,15 @@ def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10,
         Additional kwargs that can will be passed to the 'plt.step' function
     """
 
-    if (norm_method is not None) and (weight is not None):
-        raise ValueError("Only one or both of 'weight' and 'norm_method' can be none")
+    if (norm_method is not None) and (scale_factor is not None):
+        raise ValueError("Only one or both of 'scale_factor' and 'norm_method' can be none")
 
     if ax is None:
         ax = plt.gca()
     elif not isinstance(ax, Axes):
         raise TypeError(f"Incorrect type for 'ax' (Expected {type(Axes)}, got {type(ax)})")
     
-    orig_hist, bin_edges = np.histogram(x, bins)
+    orig_hist, bin_edges = np.histogram(x, bins, weights=weights)
 
     if err_type == "poisson":
         orig_err = np.sqrt(orig_hist, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
@@ -58,12 +60,12 @@ def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10,
         raise NotImplementedError("Only valid err_type is 'poisson'")
     
 
-    if norm_method is None and weight is None:
+    if norm_method is None and scale_factor is None:
         hist = orig_hist
         err = orig_err
-    elif weight is not None:
-        hist = orig_hist * weight
-        err = orig_err * weight
+    elif scale_factor is not None:
+        hist = orig_hist * scale_factor
+        err = orig_err * scale_factor
     elif norm_method == "area":
         sf = 1 / np.diff(bin_edges) / np.sum(orig_hist)
         hist = orig_hist * sf
@@ -90,7 +92,8 @@ def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10,
 
 
 def histerr_comparison(arrays: ArrayLike, err_types: Iterable[str] | str = "poisson", bins: int | ArrayLike = 10, 
-                       norm_methods: Iterable[str] | str | None = None, weights: ArrayLike | None = None, steps: Iterable[str] | str = "post", 
+                       norm_methods: Iterable[str | None] | str | None = None, weights: ArrayLike | None = None, 
+                       scale_factors: Iterable[float | None] | float | None = None, steps: Iterable[str] | str = "post", 
                        ax: Axes | None = None, **mpl_kwargs):
     """
     Deals with a plot I seem to make *a lot*, plots a set of histograms together and creates an additional comparison at
@@ -105,7 +108,7 @@ def histerr_comparison(arrays: ArrayLike, err_types: Iterable[str] | str = "pois
     norm_methods : str or None or sequence of str or None
         Sets the norm_method for each array, see 'histerr' for details
     weights : float or None or sequence of float or None
-        Sets the weight for each array, see 'histerr' for details
+        Sets the weight for each element in each array. Must be the same shape as arrays.
     steps : str or sequence of str
         Sets the step for each array, see 'histerr' for details
     ax : None or Axes
@@ -123,10 +126,15 @@ def histerr_comparison(arrays: ArrayLike, err_types: Iterable[str] | str = "pois
         arr = np.asarray(bins)
         if arr.ndim > 1:
             raise ValueError("All bins must be the same")
+        
+    weights = _create_iterable(weights, len(arrays))
+    for j in range(len(weights)):
+        if weights[j] is not None and len(arrays[j]) != len(weights[j]):
+                raise ValueError(f"The length of weights[{j}] ({len(weights[j])}) is not None and does not match the length of arrays[{j}] ({len(arrays[j])})")
     
     err_types = _create_iterable(err_types, len(arrays))
     norm_methods = _create_iterable(norm_methods, len(arrays))
-    weights = _create_iterable(weights, len(arrays))
+    scale_factors = _create_iterable(scale_factors, len(arrays))
     steps = _create_iterable(steps, len(arrays))
 
     # Special kwarg checks
@@ -159,9 +167,9 @@ def histerr_comparison(arrays: ArrayLike, err_types: Iterable[str] | str = "pois
             zorder=2 # default value
 
         _, (bin_edges, hist, err) = histerr(arrays[i], err_type=err_types[i], bins=bins, 
-                                         norm_method=norm_methods[i], weight=weights[i], 
-                                         step=steps[i], ax=ax, color=colors[i], label=labels[i], 
-                                         zorder=zorder, **mpl_kwargs)
+                                         norm_method=norm_methods[i], scale_factor=scale_factors[i],
+                                         weights=weights[i], step=steps[i], ax=ax, color=colors[i], 
+                                         label=labels[i], zorder=zorder, **mpl_kwargs)
         
         # Apply same color from most recently plotted line
         color = ax.get_lines()[-1].get_color()
