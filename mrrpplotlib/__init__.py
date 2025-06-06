@@ -5,10 +5,11 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-from collections.abc import Iterable
+from collections.abc import Sequence
+from typing import Any, Literal
 
-def _create_iterable(obj, length: int, force_iter=False):
-    if not isinstance(obj, Iterable) or isinstance(obj, str) or force_iter:
+def _create_sequence(obj: Any, length: int, force_iter=False) -> Sequence[Any]:
+    if not isinstance(obj, Sequence) or isinstance(obj, str) or force_iter:
         return [obj] * length
     if len(obj) == length:
         return obj
@@ -17,8 +18,8 @@ def _create_iterable(obj, length: int, force_iter=False):
     
 
 def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10, norm_method: str | None = None, 
-            weights: ArrayLike | None = None, scale_factor: float | None = None, step: str = "post", ax: Axes | None = None, 
-            **mpl_kwargs):
+            weights: ArrayLike | None = None, scale_factor: float | None = None, step: Literal["pre", "mid", "post"] | None = "post", 
+            ax: Axes | None = None, **mpl_kwargs):
     """
     Works like a regular histogram, but additionally handles adding in error bar via ax.fill_between
 
@@ -91,15 +92,16 @@ def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10,
     return ax, (bin_edges, hist, err)
 
 
-def histerr_comparison(arrays: ArrayLike, err_types: Iterable[str] | str = "poisson", bins: int | ArrayLike = 10, 
-                       norm_methods: Iterable[str | None] | str | None = None, weights: ArrayLike | None = None, 
-                       scale_factors: Iterable[float | None] | float | None = None, steps: Iterable[str] | str = "post", 
+def histerr_comparison(arrays: Sequence[ArrayLike], err_types: Sequence[str] | str = "poisson", bins: int | ArrayLike = 10, 
+                       norm_methods: Sequence[str | None] | str | None = None, weights: Sequence[ArrayLike | None] | ArrayLike | None = None, 
+                       scale_factors: Sequence[float | None] | float | None = None, 
+                       steps: Sequence[Literal["pre", "mid", "post"] | None] | Literal["pre", "mid", "post"] | None = "post", 
                        ax: Axes | None = None, **mpl_kwargs):
     """
     Deals with a plot I seem to make *a lot*, plots a set of histograms together and creates an additional comparison at
     the bottom of the plot between the two.
     
-    arrays : ArrayLike
+    arrays : sequence of ArrayLike
         Set of arrays from which to build our histograms. The histogram that is compared against will always be the first entry
     err_types : str or sequence of str
         Sets the err_type value for each of the arrays, see 'histerr' for details
@@ -120,32 +122,32 @@ def histerr_comparison(arrays: ArrayLike, err_types: Iterable[str] | str = "pois
 
     # Sanity checks
     for array in arrays:
-        if not isinstance(array, Iterable):
+        if not isinstance(array, Sequence):
             raise ValueError("Arrays must be an array-like sequence of arrays")
     if not isinstance(bins, (int, str)):
         arr = np.asarray(bins)
         if arr.ndim > 1:
             raise ValueError("All bins must be the same")
         
-    weights = _create_iterable(weights, len(arrays))
-    for j in range(len(weights)):
-        if weights[j] is not None and len(arrays[j]) != len(weights[j]):
-                raise ValueError(f"The length of weights[{j}] ({len(weights[j])}) is not None and does not match the length of arrays[{j}] ({len(arrays[j])})")
+    _weights: Sequence[ArrayLike | None] = _create_sequence(weights, len(arrays))
+    for j in range(len(_weights)):
+        if _weights[j] is not None and np.shape(arrays[j]) != np.shape(_weights[j]):
+            raise ValueError(f"The shape of weights[{j}] ({np.shape(_weights[j])}) is not None and does not match the length of arrays[{j}] ({np.shape(arrays[j])})")
     
-    err_types = _create_iterable(err_types, len(arrays))
-    norm_methods = _create_iterable(norm_methods, len(arrays))
-    scale_factors = _create_iterable(scale_factors, len(arrays))
-    steps = _create_iterable(steps, len(arrays))
+    err_types = _create_sequence(err_types, len(arrays))
+    norm_methods = _create_sequence(norm_methods, len(arrays))
+    scale_factors = _create_sequence(scale_factors, len(arrays))
+    steps = _create_sequence(steps, len(arrays))
 
     # Special kwarg checks
     if (color := mpl_kwargs.pop("color", None)) is not None:
-        colors = _create_iterable(color, len(arrays))
+        colors = _create_sequence(color, len(arrays))
     else:
-        colors = _create_iterable(mpl_kwargs.pop("colors", None), len(arrays))
+        colors = _create_sequence(mpl_kwargs.pop("colors", None), len(arrays))
     if (label := mpl_kwargs.pop("label", None)) is not None:
-        labels = _create_iterable(label, len(arrays))
+        labels = _create_sequence(label, len(arrays))
     else:
-        labels = _create_iterable(mpl_kwargs.pop("labels", None), len(arrays))
+        labels = _create_sequence(mpl_kwargs.pop("labels", None), len(arrays))
     
     if ax is None:
         f = plt.gcf()
@@ -168,7 +170,7 @@ def histerr_comparison(arrays: ArrayLike, err_types: Iterable[str] | str = "pois
 
         _, (bin_edges, hist, err) = histerr(arrays[i], err_type=err_types[i], bins=bins, 
                                          norm_method=norm_methods[i], scale_factor=scale_factors[i],
-                                         weights=weights[i], step=steps[i], ax=ax, color=colors[i], 
+                                         weights=_weights[i], step=steps[i], ax=ax, color=colors[i], 
                                          label=labels[i], zorder=zorder, **mpl_kwargs)
         
         # Apply same color from most recently plotted line
