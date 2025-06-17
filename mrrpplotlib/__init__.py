@@ -9,12 +9,15 @@ from collections.abc import Sequence
 from typing import Any, Literal
 
 def _create_sequence(obj: Any, length: int, force_iter=False) -> Sequence[Any]:
-    if not isinstance(obj, Sequence) or isinstance(obj, str) or force_iter:
+    try:
+        if not isinstance(obj, str) and len(obj) == length:
+            return obj
+        elif isinstance(obj, str):
+            return [obj] * length
+        else:
+            raise ValueError(f"Expected object of length [{length}], got [{len(obj)}]")
+    except TypeError:
         return [obj] * length
-    if len(obj) == length:
-        return obj
-    else:
-        raise ValueError(f"Expected object of length [{length}], got [{len(obj)}]")
     
 
 def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10, norm_method: str | None = None, 
@@ -92,7 +95,7 @@ def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10,
     return ax, (bin_edges, hist, err)
 
 
-def histerr_comparison(arrays: Sequence[ArrayLike], err_types: Sequence[str] | str = "poisson", bins: int | ArrayLike = 10, 
+def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike, err_types: Sequence[str] | str = "poisson", bins: int | ArrayLike = 10, 
                        norm_methods: Sequence[str | None] | str | None = None, weights: Sequence[ArrayLike | None] | ArrayLike | None = None, 
                        scale_factors: Sequence[float | None] | float | None = None, 
                        steps: Sequence[Literal["pre", "mid", "post"] | None] | Literal["pre", "mid", "post"] | None = "post", 
@@ -122,7 +125,7 @@ def histerr_comparison(arrays: Sequence[ArrayLike], err_types: Sequence[str] | s
 
     # Sanity checks
     for array in arrays:
-        if not isinstance(array, Sequence):
+        if not isinstance(array, ArrayLike):
             raise ValueError("Arrays must be an array-like sequence of arrays")
     if not isinstance(bins, (int, str)):
         arr = np.asarray(bins)
