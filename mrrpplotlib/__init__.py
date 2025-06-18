@@ -20,16 +20,27 @@ def _create_sequence(obj: Any, length: int, force_iter=False) -> Sequence[Any]:
         return [obj] * length
     
 
-def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10, norm_method: str | None = None, 
-            weights: ArrayLike | None = None, scale_factor: float | None = None, step: Literal["pre", "mid", "post"] | None = "post", 
-            ax: Axes | None = None, **mpl_kwargs):
+def histerr(x: ArrayLike, 
+            stat_err_type: str = "poisson", 
+            syst_err: ArrayLike | None = None, 
+            bins: int | ArrayLike = 10, 
+            norm_method: str | None = None, 
+            weights: ArrayLike | None = None, 
+            scale_factor: float | None = None, 
+            step: Literal["pre", "mid", "post"] | None = "post", 
+            ax: Axes | None = None, 
+            **mpl_kwargs):
     """
     Works like a regular histogram, but additionally handles adding in error bar via ax.fill_between
 
     x : ArrayLike
         The input data to create a histogram from.
-    err_type : str
-        The type of error of the histogram. Currently only supported type is Poisson (error is the square root of the count of any given bin)
+    stat_err_type : str
+        The type of stat error of the histogram. Currently only supported type is Poisson (error is the square root of the count of any given bin)
+    syst_err : ArrayLike or None
+        Systematic errors on each element of the input array. Must either be the same shape as x, or have shape (len(x), 2) for 1down, 1up systematics per
+        array entry. Currently, multi-dimensional arrays will not be flatted and probably won't work as expected. Systematics errors are assumed to be non-relative, 
+        non-negative values
     bins : int or sequence of scalars or str
         Binning for the histogram, same as bins in np.histogram
     norm_method : str or None
@@ -58,26 +69,48 @@ def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10,
     
     orig_hist, bin_edges = np.histogram(x, bins, weights=weights)
 
-    if err_type == "poisson":
-        orig_err = np.sqrt(orig_hist, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+    if syst_err is not None:
+        syst_err = np.asarray(syst_err)
+        if syst_err.ndim == 2 and syst_err.shape[1] == 2:
+            syst_down = syst_err.T[0]
+            syst_up = syst_err.T[1]
+        elif syst_err.ndim == 2 and syst_err.shape[1] != 2 or syst_err.ndim > 2:
+            raise ValueError("Unsupported syst_err array shape")
+        elif syst_err.ndim == 1:
+            syst_down = syst_up = syst_err
+    
+        if weights is None:
+            weights = np.ones_like(x)
+        orig_hist_1down, _ = np.histogram(x, bins, weights=weights-syst_down)
+        orig_hist_1up, _   = np.histogram(x, bins, weights=weights+syst_up)
+
+    if stat_err_type == "poisson" and syst_err is None:
+        orig_err_down = orig_err_up = np.sqrt(orig_hist, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+    elif stat_err_type == "poisson" and syst_err is not None:
+        orig_err_down = np.sqrt(orig_hist + (orig_hist_1down - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+        orig_err_up   = np.sqrt(orig_hist + (orig_hist_1up   - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
     else:
-        raise NotImplementedError("Only valid err_type is 'poisson'")
+        raise NotImplementedError("Only valid stat_err_type is 'poisson'")
     
 
     if norm_method is None and scale_factor is None:
         hist = orig_hist
-        err = orig_err
+        err_down = orig_err_down
+        err_up = orig_err_up
     elif scale_factor is not None:
         hist = orig_hist * scale_factor
-        err = orig_err * scale_factor
+        err_down = orig_err_down * scale_factor
+        err_up = orig_err_up * scale_factor
     elif norm_method == "area":
         sf = 1 / np.diff(bin_edges) / np.sum(orig_hist)
         hist = orig_hist * sf
-        err = orig_err * sf
+        err_down = orig_err_down * sf
+        err_up = orig_err_up * sf
     elif norm_method == "count":
         sf = 1 / np.sum(orig_hist)
         hist = orig_hist * sf
-        err = orig_err * sf
+        err_down = orig_err_down * sf
+        err_up = orig_err_up * sf
     else:
         raise ValueError(f"Unknown normalization method: {norm_method}")
 
@@ -86,17 +119,22 @@ def histerr(x: ArrayLike, err_type: str = "poisson", bins: int | ArrayLike = 10,
     step_bins = np.concatenate(([bin_edges[0]], bin_edges, [bin_edges[-1]]))
     step_hist = np.concatenate(([0], hist, [hist[-1], 0]))
     fill_hist = np.concatenate((hist, [hist[-1]]))
-    fill_err  = np.concatenate((err, [err[-1]]))
+    fill_err_up  = np.concatenate((err_up, [err_up[-1]]))
+    fill_err_down  = np.concatenate((err_down, [err_down[-1]]))
 
     lines = ax.step(step_bins, step_hist, where=step, **mpl_kwargs)
-    ax.fill_between(bin_edges, fill_hist + fill_err, fill_hist - fill_err,
+    ax.fill_between(bin_edges, fill_hist + fill_err_up, fill_hist - fill_err_down,
                     alpha=0.3, step=step, color=lines[0].get_color()) # Fill between not customizeable, probably fine
 
-    return ax, (bin_edges, hist, err)
+    return ax, (bin_edges, hist, err_down, err_up)
 
 
-def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike, err_types: Sequence[str] | str = "poisson", bins: int | ArrayLike = 10, 
-                       norm_methods: Sequence[str | None] | str | None = None, weights: Sequence[ArrayLike | None] | ArrayLike | None = None, 
+def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike, 
+                       stat_err_types: Sequence[str] | str = "poisson", 
+                       syst_errs: Sequence[ArrayLike | None] | ArrayLike | None = None, 
+                       bins: int | ArrayLike = 10, 
+                       norm_methods: Sequence[str | None] | str | None = None, 
+                       weights: Sequence[ArrayLike | None] | ArrayLike | None = None, 
                        scale_factors: Sequence[float | None] | float | None = None, 
                        steps: Sequence[Literal["pre", "mid", "post"] | None] | Literal["pre", "mid", "post"] | None = "post", 
                        ax: Axes | None = None, **mpl_kwargs):
@@ -137,7 +175,12 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike, err_types: Seque
         if _weights[j] is not None and np.shape(arrays[j]) != np.shape(_weights[j]):
             raise ValueError(f"The shape of weights[{j}] ({np.shape(_weights[j])}) is not None and does not match the length of arrays[{j}] ({np.shape(arrays[j])})")
     
-    err_types = _create_sequence(err_types, len(arrays))
+    _syst_errs: Sequence[ArrayLike | None] = _create_sequence(syst_errs, len(arrays))
+    for k in range(len(_syst_errs)):
+        if _syst_errs[j] is not None and np.shape(arrays[j]) != np.shape(_syst_errs[j]):
+            raise ValueError(f"The shape of syst_errs[{j}] ({np.shape(_syst_errs[j])}) is not None and does not match the length of arrays[{j}] ({np.shape(arrays[j])})")
+    
+    stat_err_types = _create_sequence(stat_err_types, len(arrays))
     norm_methods = _create_sequence(norm_methods, len(arrays))
     scale_factors = _create_sequence(scale_factors, len(arrays))
     steps = _create_sequence(steps, len(arrays))
@@ -163,7 +206,8 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike, err_types: Seque
 
     bin_edges_list = []
     hist_list = []
-    err_list = []
+    err_down_list = []
+    err_up_list = []
 
     for i in range(len(arrays)):
         if i == 0:
@@ -171,37 +215,39 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike, err_types: Seque
         else:
             zorder=2 # default value
 
-        _, (bin_edges, hist, err) = histerr(arrays[i], err_type=err_types[i], bins=bins, 
-                                         norm_method=norm_methods[i], scale_factor=scale_factors[i],
-                                         weights=_weights[i], step=steps[i], ax=ax, color=colors[i], 
-                                         label=labels[i], zorder=zorder, **mpl_kwargs)
+        _, (bin_edges, hist, err_down, err_up) = histerr(arrays[i], stat_err_type=stat_err_types[i], syst_err=_syst_errs[i], 
+                                                         bins=bins, norm_method=norm_methods[i], scale_factor=scale_factors[i], 
+                                                         weights=_weights[i], step=steps[i], ax=ax, color=colors[i], 
+                                                         label=labels[i], zorder=zorder, **mpl_kwargs)
         
         # Apply same color from most recently plotted line
         color = ax.get_lines()[-1].get_color()
 
         bin_edges_list.append(bin_edges)
         hist_list.append(hist)
-        err_list.append(err)
+        err_down_list.append(err_down)
+        err_up_list.append(err_up)
         
         step_bins = np.concatenate(([bin_edges[0]], bin_edges, [bin_edges[-1]]))
         step_hist = np.concatenate(([0], hist, [hist[-1], 0]))
         fill_hist = np.concatenate((hist, [hist[-1]]))
-        fill_err  = np.concatenate((err, [err[-1]]))
+        fill_err_down  = np.concatenate((err_down, [err_down[-1]]))
+        fill_err_up  = np.concatenate((err_up, [err_up[-1]]))
 
         if i == 0:
             # Grab our comparison histograms
             step_hist_0 = step_hist
             fill_hist_0 = fill_hist
             ax2.hlines(1, bin_edges[0], bin_edges[-1], "k", lw=2, linestyle="dashed")
-            ax2.fill_between(bin_edges, 1 - np.divide(fill_err, fill_hist, where=(fill_hist > 0), out=(np.ones(fill_hist.shape) *  2)),
-                                        1 + np.divide(fill_err, fill_hist, where=(fill_hist > 0), out=(np.ones(fill_hist.shape) * -2)),
+            ax2.fill_between(bin_edges, 1 - np.divide(fill_err_down, fill_hist, where=(fill_hist > 0), out=(np.ones(fill_hist.shape) *  2)),
+                                        1 + np.divide(fill_err_up, fill_hist, where=(fill_hist > 0), out=(np.ones(fill_hist.shape) * -2)),
                                         alpha=0.3, step="post", color=color)
         else:
             ax2.step(step_bins, np.divide(step_hist, step_hist_0, where=(step_hist_0 > 0), out=(np.ones(step_hist.shape) * -1)), where=steps[i], color=color, **mpl_kwargs)
-            ax2.fill_between(bin_edges, np.divide((fill_hist - fill_err), fill_hist_0, where=(fill_hist_0 > 0), out=(np.ones(fill_hist.shape) * -1)),
-                                        np.divide((fill_hist + fill_err), fill_hist_0, where=(fill_hist_0 > 0), out=(np.ones(fill_hist.shape) * -1)),
+            ax2.fill_between(bin_edges, np.divide((fill_hist - fill_err_down), fill_hist_0, where=(fill_hist_0 > 0), out=(np.ones(fill_hist.shape) * -1)),
+                                        np.divide((fill_hist + fill_err_up), fill_hist_0, where=(fill_hist_0 > 0), out=(np.ones(fill_hist.shape) * -1)),
                                         alpha=0.3, step="post", color=color)
 
         # These -1 values just mean "no data" and -1 seems a convienient enough number to shove off of the plot
 
-    return (ax, ax2), (bin_edges_list, hist_list, err_list)
+    return (ax, ax2), (bin_edges_list, hist_list, err_down_list, err_up_list)
