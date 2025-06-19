@@ -60,7 +60,10 @@ def histerr(x: ArrayLike,
     """
 
     if (norm_method is not None) and (scale_factor is not None):
-        raise ValueError("Only one or both of 'scale_factor' and 'norm_method' can be none")
+        raise ValueError("Only one or both of 'scale_factor' and 'norm_method' can be None")
+
+    if (weights is not None) and (scale_factor is not None):
+        raise ValueError("Only one or both of 'scale_factor' and 'weights' can be None")
 
     if ax is None:
         ax = plt.gca()
@@ -84,11 +87,17 @@ def histerr(x: ArrayLike,
         orig_hist_1down, _ = np.histogram(x, bins, weights=weights-syst_down)
         orig_hist_1up, _   = np.histogram(x, bins, weights=weights+syst_up)
 
-    if stat_err_type == "poisson" and syst_err is None:
-        orig_err_down = orig_err_up = np.sqrt(orig_hist, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
-    elif stat_err_type == "poisson" and syst_err is not None:
-        orig_err_down = np.sqrt(orig_hist + (orig_hist_1down - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
-        orig_err_up   = np.sqrt(orig_hist + (orig_hist_1up   - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+    if stat_err_type == "poisson":
+        if syst_err is None and weights is None:
+            orig_err_down = orig_err_up = np.sqrt(orig_hist, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+        elif syst_err is None and weights is not None:
+            orig_err_down = orig_err_up = np.sqrt(np.histogram(x, bins, weights=weights**2)[0], where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+        elif syst_err is not None and weights is None:
+            orig_err_down = np.sqrt(orig_hist + (orig_hist_1down - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+            orig_err_up   = np.sqrt(orig_hist + (orig_hist_1up   - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+        else:
+            orig_err_down = np.sqrt(np.histogram(x, bins, weights=weights**2)[0] + (orig_hist_1down - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+            orig_err_up   = np.sqrt(np.histogram(x, bins, weights=weights**2)[0] + (orig_hist_1up   - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
     else:
         raise NotImplementedError("Only valid stat_err_type is 'poisson'")
     
