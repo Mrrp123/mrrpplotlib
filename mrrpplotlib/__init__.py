@@ -248,8 +248,8 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
             step_hist_0 = step_hist
             fill_hist_0 = fill_hist
             ax2.hlines(1, bin_edges[0], bin_edges[-1], "k", lw=2, linestyle="dashed")
-            ax2.fill_between(bin_edges, 1 - np.divide(fill_err_down, fill_hist, where=(fill_hist > 0), out=(np.ones(fill_hist.shape) *  2)),
-                                        1 + np.divide(fill_err_up, fill_hist, where=(fill_hist > 0), out=(np.ones(fill_hist.shape) * -2)),
+            ax2.fill_between(bin_edges, 1 - np.divide(fill_err_down, fill_hist, where=(fill_hist > 0), out=np.zeros(fill_hist.shape)),
+                                        1 + np.divide(fill_err_up, fill_hist, where=(fill_hist > 0), out=np.zeros(fill_hist.shape)),
                                         alpha=0.3, step="post", color=color)
         else:
             ax2.step(step_bins, np.divide(step_hist, step_hist_0, where=(step_hist_0 > 0), out=(np.ones(step_hist.shape) * -1)), where=steps[i], color=color, **mpl_kwargs)
