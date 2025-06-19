@@ -172,8 +172,10 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
 
     # Sanity checks
     for array in arrays:
-        if not isinstance(array, ArrayLike):
-            raise ValueError("Arrays must be an array-like sequence of arrays")
+        try:
+            np.asarray(array)
+        except TypeError:
+            TypeError("Arrays must be an array-like sequence of arrays")
     if not isinstance(bins, (int, str)):
         arr = np.asarray(bins)
         if arr.ndim > 1:
