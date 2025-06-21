@@ -21,7 +21,7 @@ def _create_sequence(obj: Any, length: int, force_iter=False) -> Sequence[Any]:
     
 
 def histerr(x: ArrayLike, 
-            stat_err_type: str = "poisson", 
+            stat_err: ArrayLike | str = "poisson", 
             syst_err: ArrayLike | None = None, 
             bins: int | ArrayLike = 10, 
             norm_method: str | None = None, 
@@ -35,12 +35,17 @@ def histerr(x: ArrayLike,
 
     x : ArrayLike
         The input data to create a histogram from.
-    stat_err_type : str
-        The type of stat error of the histogram. Currently only supported type is Poisson (error is the square root of the count of any given bin)
+    stat_err : ArrayLike or str
+        The type of stat error of the histogram, stat errors apply only to the bins and their counts. You can pass in a string (like 'poisson') 
+        which will calculate the errors based on sqrt(N) of the bins counts (or sqrt(sum(w^2)) if hist is weighted) or you can pass in the 
+        errors directly if need be (Note: make sure your bins are identical, else you may getnonsense results). Stat errs are assumed to be symmetric.
+        Note: stat errors apply to the bins, while syst errors apply to weights. Also note: stat errors should be the *UNSCALED* final stat errors. So
+        the errors WILL be affected if scale_factor or norm_method is passed in, but are unaffected by weights.
     syst_err : ArrayLike or None
         Systematic errors on each element of the input array. Must either be the same shape as x, or have shape (len(x), 2) for 1down, 1up systematics per
         array entry. Currently, multi-dimensional arrays will not be flatted and probably won't work as expected. Systematics errors are assumed to be non-relative, 
-        non-negative values
+        non-negative values. These are basically intended to be errors on the weight of each element in the array. Note: syst errors should be the *UNSCALED* 
+        final errors. So the errors WILL be affected if scale_factor or norm_method is passed in, but are unaffected by weights.
     bins : int or sequence of scalars or str
         Binning for the histogram, same as bins in np.histogram
     norm_method : str or None
@@ -87,7 +92,18 @@ def histerr(x: ArrayLike,
         orig_hist_1down, _ = np.histogram(x, bins, weights=weights-syst_down)
         orig_hist_1up, _   = np.histogram(x, bins, weights=weights+syst_up)
 
-    if stat_err_type == "poisson":
+    if not isinstance(stat_err, str):
+        stat_err = np.asarray(stat_err)
+        if (stat_err.ndim == 1 and stat_err.shape == (len(orig_hist),)):
+            if syst_err is None:
+                orig_err_down = orig_err_up = stat_err
+            else:
+                orig_err_down = np.sqrt(stat_err**2 + (orig_hist_1down - orig_hist)**2)
+                orig_err_up   = np.sqrt(stat_err**2 + (orig_hist_1up   - orig_hist)**2)
+        else:
+            raise ValueError(f"Incorrect dimensions for stat_err (expected ({len(orig_hist)},) got {stat_err.shape}")
+        
+    elif stat_err == "poisson":
         if syst_err is None and weights is None:
             orig_err_down = orig_err_up = np.sqrt(orig_hist, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
         elif syst_err is None and weights is not None:
@@ -99,7 +115,7 @@ def histerr(x: ArrayLike,
             orig_err_down = np.sqrt(np.histogram(x, bins, weights=weights**2)[0] + (orig_hist_1down - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
             orig_err_up   = np.sqrt(np.histogram(x, bins, weights=weights**2)[0] + (orig_hist_1up   - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
     else:
-        raise NotImplementedError("Only valid stat_err_type is 'poisson'")
+        raise NotImplementedError("Only current valid stat_err string value is 'poisson'")
     
 
     if norm_method is None and scale_factor is None:
@@ -139,7 +155,7 @@ def histerr(x: ArrayLike,
 
 
 def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike, 
-                       stat_err_types: Sequence[str] | str = "poisson", 
+                       stat_errs: Sequence[ArrayLike | str] | ArrayLike | str = "poisson", 
                        syst_errs: Sequence[ArrayLike | None] | ArrayLike | None = None, 
                        bins: int | ArrayLike = 10, 
                        norm_methods: Sequence[str | None] | str | None = None, 
@@ -180,6 +196,11 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
         arr = np.asarray(bins)
         if arr.ndim > 1:
             raise ValueError("All bins must be the same")
+    
+    if isinstance(bins, int):
+        num_bins = bins
+    else:
+        num_bins = len(bins) - 1 # bins also includes right edge, so subtract 1 from len
         
     _weights: Sequence[ArrayLike | None] = _create_sequence(weights, len(arrays))
     for j in range(len(_weights)):
@@ -191,7 +212,11 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
         if _syst_errs[k] is not None and np.size(arrays[k]) != np.shape(_syst_errs[k])[0]:
             raise ValueError(f"The len of syst_errs[{k}] ({np.shape(_syst_errs[k])}) is not None and does not match the flattened length of arrays[{k}] ({np.size(arrays[k])})")
     
-    stat_err_types = _create_sequence(stat_err_types, len(arrays))
+    _stat_errs: Sequence[ArrayLike | str] = _create_sequence(stat_errs, len(arrays))
+    for l in range(len(_stat_errs)):
+        if not isinstance(_stat_errs[l], str) and len(_stat_errs[l]) != num_bins:
+            raise ValueError(f"stat_errs[l] is not a string and len of stat_errs[{l}] ({len(_stat_errs[l])}) does not match the number of bins ({num_bins})")
+
     norm_methods = _create_sequence(norm_methods, len(arrays))
     scale_factors = _create_sequence(scale_factors, len(arrays))
     steps = _create_sequence(steps, len(arrays))
@@ -226,7 +251,7 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
         else:
             zorder=2 # default value
 
-        _, (bin_edges, hist, err_down, err_up) = histerr(arrays[i], stat_err_type=stat_err_types[i], syst_err=_syst_errs[i], 
+        _, (bin_edges, hist, err_down, err_up) = histerr(arrays[i], stat_err=_stat_errs[i], syst_err=_syst_errs[i], 
                                                          bins=bins, norm_method=norm_methods[i], scale_factor=scale_factors[i], 
                                                          weights=_weights[i], step=steps[i], ax=ax, color=colors[i], 
                                                          label=labels[i], zorder=zorder, **mpl_kwargs)
