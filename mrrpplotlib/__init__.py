@@ -210,7 +210,7 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
     _syst_errs: Sequence[ArrayLike | None] = _create_sequence(syst_errs, len(arrays))
     for k in range(len(_syst_errs)):
         if _syst_errs[k] is not None and np.size(arrays[k]) != np.shape(_syst_errs[k])[0]:
-            raise ValueError(f"The len of syst_errs[{k}] ({np.shape(_syst_errs[k])}) is not None and does not match the flattened length of arrays[{k}] ({np.size(arrays[k])})")
+            raise ValueError(f"The len of syst_errs[{k}] ({np.shape(_syst_errs[k])[0]}) is not None and does not match the flattened length of arrays[{k}] ({np.size(arrays[k])})")
     
     _stat_errs: Sequence[ArrayLike | str] = _create_sequence(stat_errs, len(arrays))
     for l in range(len(_stat_errs)):
