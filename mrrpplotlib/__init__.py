@@ -8,7 +8,8 @@ from matplotlib.axes import Axes
 from collections.abc import Sequence
 from typing import Any, Literal
 
-def _create_sequence(obj: Any, length: int, force_iter=False) -> Sequence[Any]:
+def _create_sequence(obj: Any, length: int) -> Sequence[Any]:
+    """Creates a sequence of length ``length`` of an arbitrary object"""
     try:
         if not isinstance(obj, str) and len(obj) == length:
             return obj
@@ -27,41 +28,56 @@ def histerr(x: ArrayLike,
             norm_method: str | None = None, 
             weights: ArrayLike | None = None, 
             scale_factor: float | None = None, 
-            step: Literal["pre", "mid", "post"] | None = "post", 
+            step: Literal["pre", "mid", "post"] = "post", 
             ax: Axes | None = None, 
             **mpl_kwargs):
     """
-    Works like a regular histogram, but additionally handles adding in error bar via ax.fill_between
+    Works like a regular histogram, but additionally handles adding in error bar via ax.fill_between.
 
+    Parameters
+    ----------
     x : ArrayLike
         The input data to create a histogram from.
-    stat_err : ArrayLike or str
+    stat_err : ArrayLike or str, default 'poisson'
         The type of stat error of the histogram, stat errors apply only to the bins and their counts. You can pass in a string (like 'poisson') 
         which will calculate the errors based on sqrt(N) of the bins counts (or sqrt(sum(w^2)) if hist is weighted) or you can pass in the 
         errors directly if need be (Note: make sure your bins are identical, else you may getnonsense results). Stat errs are assumed to be symmetric.
         Note: stat errors apply to the bins, while syst errors apply to weights. Also note: stat errors should be the *UNSCALED* final stat errors. So
         the errors WILL be affected if scale_factor or norm_method is passed in, but are unaffected by weights.
-    syst_err : ArrayLike or None
+    syst_err : ArrayLike or None, default None
         Systematic errors on each element of the input array. Must either be the same shape as x, or have shape (len(x), 2) for 1down, 1up systematics per
         array entry. Currently, multi-dimensional arrays will not be flatted and probably won't work as expected. Systematics errors are assumed to be non-relative, 
         non-negative values. These are basically intended to be errors on the weight of each element in the array. Note: syst errors should be the *UNSCALED* 
         final errors. So the errors WILL be affected if scale_factor or norm_method is passed in, but are unaffected by weights.
-    bins : int or sequence of scalars or str
+    bins : int or sequence of scalars or str, default 10
         Binning for the histogram, same as bins in np.histogram
-    norm_method : str or None
+    norm_method : str or None, default None
         Determines the normalization method used on the histogram, can be either 'count' (sum of counts in histogram equals 1) or 
-        'area' (integral of histogram/area of bins equals 1). Cannot be set at the same time as 'weight'
-    weights : ArrayLike or None
-        Determines the weight for each entry in the histogram, same as weight in np.histogram
-    scale_factor : float or None
-        Determines a flat scaling factor to multiply our array by. Cannot be set at the same time as 'norm_method'
-    step : str
+        'area' (integral of histogram/area of bins equals 1). Cannot be set at the same time as 'weight'.
+    weights : ArrayLike or None, default None
+        Determines the weight for each entry in the histogram, same as weight in np.histogram.
+    scale_factor : float or None, default None
+        Determines a flat scaling factor to multiply our array by. Cannot be set at the same time as 'norm_method'.
+    step : {"pre", "mid", "post"}, default 'post'
         Same as passing 'where' parameter to plt.step and 'step' parameter to 'plt.fill_between', basically determines where your histogram
-        edges are visually relative to the bins ('pre', 'mid' or 'post'), generally want to keep this as 'post'
-    ax : Axes
-        Pass in an optional Axes parameter to have the plot apply to that axis rather than creating a new one
+        edges are visually relative to the bins ('pre', 'mid' or 'post'), generally want to keep this as 'post'.
+    ax : Axes or None, default None
+        Pass in an optional Axes parameter to have the plot apply to that axis rather than creating a new one.
     **mpl_kwargs : any
-        Additional kwargs that can will be passed to the 'plt.step' function
+        Additional kwargs that can will be passed to the 'plt.step' function.
+    
+    Returns
+    -------
+    ax : Axes
+        Axes of the plot that is drawn to.
+    bin_edges : array of dtype float
+        Bin edges of the histogram ``(length(hist)+1).``
+    hist : array
+        The values of the histogram.
+    err_down : array
+        The values of the lower bounds for the error bars for the histogram.
+    err_up : array
+        The values of the upper bounds for the error bars for the histogram.
     """
 
     if (norm_method is not None) and (scale_factor is not None):
@@ -162,28 +178,51 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
                        weights: Sequence[ArrayLike | None] | ArrayLike | None = None, 
                        scale_factors: Sequence[float | None] | float | None = None, 
                        steps: Sequence[Literal["pre", "mid", "post"] | None] | Literal["pre", "mid", "post"] | None = "post", 
-                       ax: Axes | None = None, **mpl_kwargs):
+                       ax: Axes | None = None, 
+                       **mpl_kwargs):
     """
     Deals with a plot I seem to make *a lot*, plots a set of histograms together and creates an additional comparison at
     the bottom of the plot between the two.
     
+    Parameters
+    ----------
     arrays : sequence of ArrayLike
-        Set of arrays from which to build our histograms. The histogram that is compared against will always be the first entry
-    err_types : str or sequence of str
-        Sets the err_type value for each of the arrays, see 'histerr' for details
-    bins : int or sequence of scalars or str (or a sequence of these)
-        Sets the bins for each array, see 'histerr' for details
-    norm_methods : str or None or sequence of str or None
-        Sets the norm_method for each array, see 'histerr' for details
-    weights : float or None or sequence of float or None
+        Set of arrays from which to build our histograms. The histogram that is compared against will always be the first entry.
+    stat_errs : str or ArrayLike or sequence of str or ArrayLike, default 'poisson'
+        Sets the stat_err for each array. See `histerr` for more details.
+    syst_errs : None or ArrayLike or sequence of None or ArrayLike, default None
+        Sets the syst_err for each array. See `histerr` for more details.
+    bins : int or ArrayLike, default 10
+        Sets the bins for each array, see `histerr` for more details.
+    norm_methods : str or None or sequence of str or None, default None
+        Sets the norm_method for each array, see `histerr` for more details.
+    weights : float or None or sequence of float or None, default None
         Sets the weight for each element in each array. Must be the same shape as arrays.
-    steps : str or sequence of str
-        Sets the step for each array, see 'histerr' for details
-    ax : None or Axes
+    scale_factors : float or None or sequence of float or None, default None
+        Sets the scale_factor for each array, see `histerr` for more details.
+    steps : {"pre", "mid", "post"} or sequence of {"pre", "mid", "post"}, default 'post'
+        Sets the step for each array, see `histerr` for more details.
+    ax : None or Axes, default None
         Axes to draw the histograms to. If None, axes will be created on the same figure, although a comparison plot will be attached below it.
     **mpl_kwargs : Any
         Additional kwargs that can will be passed to the 'plt.step' functions. Note, if 'colors' or 'labels' is in the kwargs instead of 'color' or 'label', each plot
-        will be given a different color/label specified by the list of colors/labels
+        will be given a different color/label specified by the list of colors/labels.
+
+    Returns
+    -------
+    ax : Axes
+        Primary Axes of the plot that is drawn to. This is the main histogram plot.
+    ax2 : Axes
+        Secondary Axes of the plot that is drawn to. This is the comparison plot that compares the relative errors of our histograms.
+    bin_edges_list : list
+        List of bin edges for each histogram. 
+    hist_list : list
+        List of values for each histogram.
+    err_down_list : list
+        List of the values of the lower bounds for the error bars for each histogram.
+    err_up_list : list
+        List of the values of the upper bounds for the error bars for each histogram.
+    
     """
 
     # Sanity checks
