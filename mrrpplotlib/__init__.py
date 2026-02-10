@@ -155,17 +155,12 @@ def histerr(x: ArrayLike,
     else:
         raise ValueError(f"Unknown normalization method: {norm_method}")
 
-    
-    
-    step_bins = np.concatenate(([bin_edges[0]], bin_edges, [bin_edges[-1]]))
-    step_hist = np.concatenate(([0], hist, [hist[-1], 0]))
-    fill_hist = np.concatenate((hist, [hist[-1]]))
-    fill_err_up  = np.concatenate((err_up, [err_up[-1]]))
-    fill_err_down  = np.concatenate((err_down, [err_down[-1]]))
-
-    lines = ax.step(step_bins, step_hist, where=step, **mpl_kwargs)
-    ax.fill_between(bin_edges, fill_hist + fill_err_up, fill_hist - fill_err_down,
-                    alpha=0.3, step=step, color=lines[0].get_color()) # Fill between not customizeable, probably fine
+    patch = ax.stairs(hist, bin_edges, baseline=0, fill=False, **mpl_kwargs)
+    # Effective ax.fill_between replacement
+    ax.stairs(hist + err_up, bin_edges, baseline=(hist - err_down), 
+              alpha=0.3, facecolor=patch.get_edgecolor(), edgecolor=patch.get_edgecolor(),
+              lw=1, fill=True)
+    # Fill between not customizeable, probably fine
 
     return ax, (bin_edges, hist, err_down, err_up)
 
@@ -296,32 +291,29 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
                                                          label=labels[i], zorder=zorder, **mpl_kwargs)
         
         # Apply same color from most recently plotted line
-        color = ax.get_lines()[-1].get_color()
+        color = colors[i]
 
         bin_edges_list.append(bin_edges)
         hist_list.append(hist)
         err_down_list.append(err_down)
         err_up_list.append(err_up)
-        
-        step_bins = np.concatenate(([bin_edges[0]], bin_edges, [bin_edges[-1]]))
-        step_hist = np.concatenate(([0], hist, [hist[-1], 0]))
-        fill_hist = np.concatenate((hist, [hist[-1]]))
-        fill_err_down  = np.concatenate((err_down, [err_down[-1]]))
-        fill_err_up  = np.concatenate((err_up, [err_up[-1]]))
 
         if i == 0:
             # Grab our comparison histograms
-            step_hist_0 = step_hist
-            fill_hist_0 = fill_hist
+            hist_0 = hist
+
             ax2.hlines(1, bin_edges[0], bin_edges[-1], "k", lw=2, linestyle="dashed")
-            ax2.fill_between(bin_edges, 1 - np.divide(fill_err_down, fill_hist, where=(fill_hist > 0), out=np.zeros(fill_hist.shape)),
-                                        1 + np.divide(fill_err_up, fill_hist, where=(fill_hist > 0), out=np.zeros(fill_hist.shape)),
-                                        alpha=0.3, step="post", color=color)
+            # Basically ax2.fill_between equivalent
+            ax2.stairs(1 + np.divide(err_up, hist, where=(hist > 0), out=np.zeros(hist.shape)), bin_edges,
+                      baseline=(1 - np.divide(err_down, hist, where=(hist > 0), out=np.zeros(hist.shape))),
+                      facecolor=color, edgecolor=color, alpha=0.3, fill=True, lw=1, zorder=1)
         else:
-            ax2.step(step_bins, np.divide(step_hist, step_hist_0, where=(step_hist_0 > 0), out=(np.ones(step_hist.shape) * -1)), where=steps[i], color=color, **mpl_kwargs)
-            ax2.fill_between(bin_edges, np.divide((fill_hist - fill_err_down), fill_hist_0, where=(fill_hist_0 > 0), out=(np.ones(fill_hist.shape) * -1)),
-                                        np.divide((fill_hist + fill_err_up), fill_hist_0, where=(fill_hist_0 > 0), out=(np.ones(fill_hist.shape) * -1)),
-                                        alpha=0.3, step="post", color=color)
+            ax2.stairs(np.divide(hist, hist_0, where=(hist_0 > 0), out=(np.ones(hist.shape) * -1)), bin_edges, 
+                       baseline=-1, color=color, zorder=2, **mpl_kwargs)
+            # Basically ax2.fill_between equivalent
+            ax2.stairs(np.divide((hist + err_up), hist_0, where=(hist_0 > 0), out=(np.ones(hist.shape) * -1)), bin_edges,
+                       baseline=np.divide((hist - err_down), hist_0, where=(hist_0 > 0), out=(np.ones(hist.shape) * -1)),
+                       facecolor=color, edgecolor=color, alpha=0.3, fill=True, lw=1, zorder=1)
 
         # These -1 values just mean "no data" and -1 seems a convienient enough number to shove off of the plot
 
