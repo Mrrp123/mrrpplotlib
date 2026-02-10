@@ -3,11 +3,14 @@ sys.path.append("..")
 from mrrpplotlib import histerr_comparison
 import numpy as np
 import matplotlib.pyplot as plt
+import tomllib
 
-
+# NOTE: It is assumed we are running this from the tests/ directory
 def test_histerr_comparison():
 
-    f, axes = plt.subplots(ncols=4, nrows=1)
+    f, axes = plt.subplots(ncols=4, nrows=1, figsize=(15, 5))
+
+    np.random.seed(123123198)
 
     samples = np.random.normal(0, 1, (2, 1000))
     weights = np.random.chisquare(1, samples.shape)
@@ -24,6 +27,9 @@ def test_histerr_comparison():
                        colors=("red", "blue"))
     histerr_comparison((samples[0], samples[0]), bins=np.arange(-5, 5.1, 0.5), labels=("abc", "def"), 
                        stat_errs=(stat_errs, "poisson"), norm_methods="area", lw=2, ax=axes[3], colors=("red", "blue")) 
-
-test_histerr_comparison()
-plt.show()
+    
+if __name__ == "__main__":
+    with open("../pyproject.toml", "rb") as fp:
+        version = tomllib.load(fp)["project"]["version"]
+    test_histerr_comparison()
+    plt.savefig(f"test_v{version}.png")
