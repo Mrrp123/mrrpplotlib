@@ -28,11 +28,10 @@ def histerr(x: ArrayLike,
             norm_method: str | None = None, 
             weights: ArrayLike | None = None, 
             scale_factor: float | None = None, 
-            step: Literal["pre", "mid", "post"] = "post", 
             ax: Axes | None = None, 
             **mpl_kwargs):
     """
-    Works like a regular histogram, but additionally handles adding in error bar via ax.fill_between.
+    Works like a regular histogram, but additionally handles adding in error bars via by filling above and below the histogram.
 
     Parameters
     ----------
@@ -58,9 +57,6 @@ def histerr(x: ArrayLike,
         Determines the weight for each entry in the histogram, same as weight in np.histogram.
     scale_factor : float or None, default None
         Determines a flat scaling factor to multiply our array by. Cannot be set at the same time as 'norm_method'.
-    step : {"pre", "mid", "post"}, default 'post'
-        Same as passing 'where' parameter to plt.step and 'step' parameter to 'plt.fill_between', basically determines where your histogram
-        edges are visually relative to the bins ('pre', 'mid' or 'post'), generally want to keep this as 'post'.
     ax : Axes or None, default None
         Pass in an optional Axes parameter to have the plot apply to that axis rather than creating a new one.
     **mpl_kwargs : any
@@ -172,11 +168,10 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
                        norm_methods: Sequence[str | None] | str | None = None, 
                        weights: Sequence[ArrayLike | None] | ArrayLike | None = None, 
                        scale_factors: Sequence[float | None] | float | None = None, 
-                       steps: Sequence[Literal["pre", "mid", "post"] | None] | Literal["pre", "mid", "post"] | None = "post", 
                        ax: Axes | None = None, 
                        **mpl_kwargs):
     """
-    Deals with a plot I seem to make *a lot*, plots a set of histograms together and creates an additional comparison at
+    Deals with a plot I seem to make *a lot*, plots a set of histograms together and creates an additional ratio comparison at
     the bottom of the plot between the two.
     
     Parameters
@@ -195,8 +190,6 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
         Sets the weight for each element in each array. Must be the same shape as arrays.
     scale_factors : float or None or sequence of float or None, default None
         Sets the scale_factor for each array, see `histerr` for more details.
-    steps : {"pre", "mid", "post"} or sequence of {"pre", "mid", "post"}, default 'post'
-        Sets the step for each array, see `histerr` for more details.
     ax : None or Axes, default None
         Axes to draw the histograms to. If None, axes will be created on the same figure, although a comparison plot will be attached below it.
     **mpl_kwargs : Any
@@ -253,7 +246,6 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
 
     norm_methods = _create_sequence(norm_methods, len(arrays))
     scale_factors = _create_sequence(scale_factors, len(arrays))
-    steps = _create_sequence(steps, len(arrays))
 
     # Special kwarg checks
     if (color := mpl_kwargs.pop("color", None)) is not None:
@@ -287,7 +279,7 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
 
         _, (bin_edges, hist, err_down, err_up) = histerr(arrays[i], stat_err=_stat_errs[i], syst_err=_syst_errs[i], 
                                                          bins=bins, norm_method=norm_methods[i], scale_factor=scale_factors[i], 
-                                                         weights=_weights[i], step=steps[i], ax=ax, color=colors[i], 
+                                                         weights=_weights[i], ax=ax, color=colors[i], 
                                                          label=labels[i], zorder=zorder, **mpl_kwargs)
         
         # Apply same color from most recently plotted line
