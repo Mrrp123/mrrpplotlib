@@ -17,5 +17,8 @@ classifiers = [
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 
+[project.urls]
+Homepage = "https://github.com/Mrrp123/mrrpplotlib"
+
 [tool.hatch.build]
 exclude = ["/.*", "/tests"]
