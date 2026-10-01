@@ -127,13 +127,13 @@ def histerr(x: ArrayLike,
         if syst_err is None and weights is None:
             orig_err_down = orig_err_up = np.sqrt(orig_hist, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
         elif syst_err is None and weights is not None:
-            orig_err_down = orig_err_up = np.sqrt(np.histogram(x, bins, weights=weights_sq)[0], where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+            orig_err_down = orig_err_up = np.sqrt(np.histogram(x, bins, weights=weights_sq)[0]) # square weights will prevent histogram being zero
         elif syst_err is not None and weights is None:
             orig_err_down = np.sqrt(orig_hist + (orig_hist_1down - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
             orig_err_up   = np.sqrt(orig_hist + (orig_hist_1up   - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
         else:
-            orig_err_down = np.sqrt(np.histogram(x, bins, weights=weights_sq)[0] + (orig_hist_1down - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
-            orig_err_up   = np.sqrt(np.histogram(x, bins, weights=weights_sq)[0] + (orig_hist_1up   - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+            orig_err_down = np.sqrt(np.histogram(x, bins, weights=weights_sq)[0] + (orig_hist_1down - orig_hist)**2) # square weights will prevent histogram being zero
+            orig_err_up   = np.sqrt(np.histogram(x, bins, weights=weights_sq)[0] + (orig_hist_1up   - orig_hist)**2)
     else:
         raise NotImplementedError("Only current valid stat_err string value is 'poisson'")
     
