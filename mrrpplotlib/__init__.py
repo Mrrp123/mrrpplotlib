@@ -41,13 +41,13 @@ def histerr(x: ArrayLike,
     stat_err : ArrayLike or str, default 'poisson'
         The type of stat error of the histogram, stat errors apply only to the bins and their counts. You can pass in a string (like 'poisson') 
         which will calculate the errors based on sqrt(N) of the bins counts (or sqrt(sum(w^2)) if hist is weighted) or you can pass in the 
-        errors directly if need be (Note: make sure your bins are identical, else you may getnonsense results). Stat errs are assumed to be symmetric.
+        errors directly if need be (Note: make sure your bin shapes are identical, else you may get nonsense results). Stat errs are assumed to be symmetric.
         Note: stat errors apply to the bins, while syst errors apply to weights. Also note: stat errors should be the *UNSCALED* final stat errors. So
         the errors WILL be affected if scale_factor or norm_method is passed in, but are unaffected by weights.
     syst_err : ArrayLike or None, default None
         Systematic errors on each element of the input array. Must either be the same shape as x, or have shape (len(x), 2) for 1down, 1up systematics per
-        array entry. Currently, multi-dimensional arrays will not be flatted and probably won't work as expected. Systematics errors are assumed to be non-relative, 
-        non-negative values. These are basically intended to be errors on the weight of each element in the array. Note: syst errors should be the *UNSCALED* 
+        array entry. Currently, multi-dimensional arrays will not be flatted and probably won't work as expected. Systematics errors are assumed to be non-relative 
+        values. These are basically intended to be errors on the weight of each element in the array. Note: syst errors should be the *UNSCALED* 
         final errors. So the errors WILL be affected if scale_factor or norm_method is passed in, but are unaffected by weights.
     bins : int or sequence of scalars or str, default 10
         Binning for the histogram, same as bins in np.histogram
@@ -62,20 +62,20 @@ def histerr(x: ArrayLike,
         Pass in an optional Axes parameter to have the plot apply to that axis rather than creating a new one.
     ignore_neg_weight_err : bool
         Sets whether or not to ignore negative weights when calculating statistical error. Negative weights will be set to zero for such calculations.
-    **mpl_kwargs : any
+    **mpl_kwargs : Any
         Additional kwargs that can will be passed to the 'plt.step' function.
     
     Returns
     -------
     ax : Axes
         Axes of the plot that is drawn to.
-    bin_edges : array of dtype float
+    bin_edges : ndarray
         Bin edges of the histogram ``(length(hist)+1).``
-    hist : array
+    hist : ndarray
         The values of the histogram.
-    err_down : array
+    err_down : ndarray
         The values of the lower bounds for the error bars for the histogram.
-    err_up : array
+    err_up : ndarray
         The values of the upper bounds for the error bars for the histogram.
     """
 
@@ -192,13 +192,13 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
     syst_errs : None or ArrayLike or sequence of None or ArrayLike, default None
         Sets the syst_err for each array. See `histerr` for more details.
     bins : int or ArrayLike, default 10
-        Sets the bins for each array, see `histerr` for more details.
+        Sets the bins for each array. See `histerr` for more details.
     norm_methods : str or None or sequence of str or None, default None
-        Sets the norm_method for each array, see `histerr` for more details.
+        Sets the norm_method for each array. See `histerr` for more details.
     weights : float or None or sequence of float or None, default None
         Sets the weight for each element in each array. Must be the same shape as arrays.
     scale_factors : float or None or sequence of float or None, default None
-        Sets the scale_factor for each array, see `histerr` for more details.
+        Sets the scale_factor for each array. See `histerr` for more details.
     ax : None or Axes, default None
         Axes to draw the histograms to. If None, axes will be created on the same figure, although a comparison plot will be attached below it.
     ignore_neg_weight_err : bool
