@@ -28,7 +28,8 @@ def histerr(x: ArrayLike,
             norm_method: str | None = None, 
             weights: ArrayLike | None = None, 
             scale_factor: float | None = None, 
-            ax: Axes | None = None, 
+            ax: Axes | None = None,
+            ignore_neg_weight_err: bool = False, 
             **mpl_kwargs):
     """
     Works like a regular histogram, but additionally handles adding in error bars via by filling above and below the histogram.
@@ -59,6 +60,8 @@ def histerr(x: ArrayLike,
         Determines a flat scaling factor to multiply our array by. Cannot be set at the same time as 'norm_method'.
     ax : Axes or None, default None
         Pass in an optional Axes parameter to have the plot apply to that axis rather than creating a new one.
+    ignore_neg_weight_err : bool
+        Sets whether or not to ignore negative weights when calculating statistical error. Negative weights will be set to zero for such calculations.
     **mpl_kwargs : any
         Additional kwargs that can will be passed to the 'plt.step' function.
     
@@ -116,16 +119,21 @@ def histerr(x: ArrayLike,
             raise ValueError(f"Incorrect dimensions for stat_err (expected ({len(orig_hist)},) got {stat_err.shape}")
         
     elif stat_err == "poisson":
+        if weights is not None:
+            if ignore_neg_weight_err:
+                weights_sq = np.where(weights > 0, weights**2, 0)
+            else:
+                weights_sq = weights**2
         if syst_err is None and weights is None:
             orig_err_down = orig_err_up = np.sqrt(orig_hist, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
         elif syst_err is None and weights is not None:
-            orig_err_down = orig_err_up = np.sqrt(np.histogram(x, bins, weights=weights**2)[0], where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+            orig_err_down = orig_err_up = np.sqrt(np.histogram(x, bins, weights=weights_sq)[0], where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
         elif syst_err is not None and weights is None:
             orig_err_down = np.sqrt(orig_hist + (orig_hist_1down - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
             orig_err_up   = np.sqrt(orig_hist + (orig_hist_1up   - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
         else:
-            orig_err_down = np.sqrt(np.histogram(x, bins, weights=weights**2)[0] + (orig_hist_1down - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
-            orig_err_up   = np.sqrt(np.histogram(x, bins, weights=weights**2)[0] + (orig_hist_1up   - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+            orig_err_down = np.sqrt(np.histogram(x, bins, weights=weights_sq)[0] + (orig_hist_1down - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
+            orig_err_up   = np.sqrt(np.histogram(x, bins, weights=weights_sq)[0] + (orig_hist_1up   - orig_hist)**2, where=(orig_hist >= 0), out=np.zeros(orig_hist.shape))
     else:
         raise NotImplementedError("Only current valid stat_err string value is 'poisson'")
     
@@ -168,7 +176,8 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
                        norm_methods: Sequence[str | None] | str | None = None, 
                        weights: Sequence[ArrayLike | None] | ArrayLike | None = None, 
                        scale_factors: Sequence[float | None] | float | None = None, 
-                       ax: Axes | None = None, 
+                       ax: Axes | None = None,
+                       ignore_neg_weight_err: bool = False, 
                        **mpl_kwargs):
     """
     Deals with a plot I seem to make *a lot*, plots a set of histograms together and creates an additional ratio comparison at
@@ -192,6 +201,8 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
         Sets the scale_factor for each array, see `histerr` for more details.
     ax : None or Axes, default None
         Axes to draw the histograms to. If None, axes will be created on the same figure, although a comparison plot will be attached below it.
+    ignore_neg_weight_err : bool
+        Whether or not to ignore stat error contributions from negative weights. See `histerr` for more details.
     **mpl_kwargs : Any
         Additional kwargs that can will be passed to the 'plt.step' functions. Note, if 'colors' or 'labels' is in the kwargs instead of 'color' or 'label', each plot
         will be given a different color/label specified by the list of colors/labels.
@@ -280,7 +291,8 @@ def histerr_comparison(arrays: Sequence[ArrayLike] | ArrayLike,
         _, (bin_edges, hist, err_down, err_up) = histerr(arrays[i], stat_err=_stat_errs[i], syst_err=_syst_errs[i], 
                                                          bins=bins, norm_method=norm_methods[i], scale_factor=scale_factors[i], 
                                                          weights=_weights[i], ax=ax, color=colors[i], 
-                                                         label=labels[i], zorder=zorder, **mpl_kwargs)
+                                                         label=labels[i], zorder=zorder, ignore_neg_weight_err=ignore_neg_weight_err,
+                                                         **mpl_kwargs)
         
         # Apply same color from most recently plotted line
         color = colors[i]
