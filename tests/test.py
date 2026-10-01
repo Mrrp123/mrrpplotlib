@@ -8,13 +8,15 @@ import tomllib
 # NOTE: It is assumed we are running this from the tests/ directory
 def test_histerr_comparison():
 
-    f, axes = plt.subplots(ncols=4, nrows=1, figsize=(15, 5))
+    f, axes = plt.subplots(ncols=6, nrows=1, figsize=(15, 5))
+    plt.subplots_adjust(left=0.05, right=0.95)
 
     np.random.seed(123123198)
 
     samples = np.random.normal(0, 1, (2, 1000))
     weights = np.random.chisquare(1, samples.shape)
     weights2 = np.ones(1000) * 0.1
+    weights3 = np.random.normal(0.1, 2, samples.shape)
     syst_errs = (np.asarray([0.001, 1]*1000).reshape(1000,2), np.asarray([0.001]*1000))
     stat_errs = np.ones((len(np.arange(-5, 5.1, 0.5)) - 1)) * 50
 
@@ -26,8 +28,14 @@ def test_histerr_comparison():
                        weights=(None, weights2), scale_factors=(0.1, None), lw=2, ax=axes[2], 
                        colors=("red", "blue"))
     histerr_comparison((samples[0], samples[0]), bins=np.arange(-5, 5.1, 0.5), labels=("abc", "def"), 
-                       stat_errs=(stat_errs, "poisson"), norm_methods="area", lw=2, ax=axes[3], colors=("red", "blue")) 
+                       stat_errs=(stat_errs, "poisson"), norm_methods="area", lw=2, ax=axes[3], colors=("red", "blue"))
+    histerr_comparison(samples, bins=np.arange(-5, 5.1, 0.5), labels=("abc", "def"), weights=weights3,
+                       lw=2, ax=axes[4], colors=("red", "green"))
+    histerr_comparison(samples, bins=np.arange(-5, 5.1, 0.5), labels=("abc", "def"), weights=weights3,
+                       lw=2, ax=axes[5], colors=("red", "green"), ignore_neg_weight_err=True)
     
+    axes[5].set_ylim(axes[4].get_ylim())
+        
 if __name__ == "__main__":
     with open("../pyproject.toml", "rb") as fp:
         version = tomllib.load(fp)["project"]["version"]
